@@ -15,6 +15,8 @@ def plot_1d(sc):
         func(F, np.zeros_like(F), **kwargs)
         ax.set_xlabel(labels[0])
 
+    ax.legend()
+
 
 def plot_2d(sc):
     sc.init_figure()
@@ -26,6 +28,8 @@ def plot_2d(sc):
         func(F[:, 0], F[:, 1], **kwargs)
         ax.set_xlabel(labels[0])
         ax.set_ylabel(labels[1])
+
+    ax.legend()
 
     return sc
 
@@ -52,6 +56,8 @@ def plot_3d(sc, angle):
         if sc.angle is not None:
             ax.view_init(*angle)
 
+    ax.legend()
+
 
 def plot_pairwise(sc):
     sc.init_figure(n_rows=sc.n_dim, n_cols=sc.n_dim)
@@ -76,7 +82,8 @@ def plot_pairwise(sc):
                     func(0, 0, s=1, color="white")
                     ax.set_xticks([])
                     ax.set_yticks([])
-                    ax.text(0, 0, labels[i], ha='center', va='center', fontsize=20)
+                    ax.text(0, 0, labels[i], ha='center',
+                            va='center', fontsize=20)
 
 
 class Scatter(Plot):
