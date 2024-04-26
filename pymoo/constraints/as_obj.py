@@ -58,7 +58,7 @@ class ModifiedConstraintsAsObjective(Meta, Problem):
 
         # append the constraint violation as objective
         if self.append:
-            out["F"] = anp.column_stack([CV, F])
+            out["F"] = anp.column_stack([F, CV])
         else:
             out["F"] = CV
 
@@ -107,7 +107,7 @@ class ConstraintsAsObjective(Meta, Problem):
 
         # append the constraint violation as objective
         if self.append:
-            out["F"] = anp.column_stack([CV, F])
+            out["F"] = anp.column_stack([F, CV])
         else:
             out["F"] = CV
 

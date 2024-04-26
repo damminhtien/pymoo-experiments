@@ -29,8 +29,8 @@ class RankAndCrowding(Survival):
                 - 'cd': crowding distances
                 - 'pcd' or 'pruning-cd': improved pruning based on crowding distances
                 - 'ce': crowding entropy
-                - 'mnn': M-Neaest Neighbors
-                - '2nn': 2-Neaest Neighbors
+                - 'mnn': M-Nearest Neighbors
+                - '2nn': 2-Nearest Neighbors
 
             If callable, it has the form ``fun(F, filter_out_duplicates=None, n_remove=None, **kwargs)``
             in which F (n, m) and must return metrics in a (n,) array.
@@ -122,8 +122,8 @@ class ConstrRankAndCrowding(Survival):
                 - 'cd': crowding distances
                 - 'pcd' or 'pruning-cd': improved pruning based on crowding distances
                 - 'ce': crowding entropy
-                - 'mnn': M-Neaest Neighbors
-                - '2nn': 2-Neaest Neighbors
+                - 'mnn': M-Nearest Neighbors
+                - '2nn': 2-Nearest Neighbors
 
             If callable, it has the form ``fun(F, filter_out_duplicates=None, n_remove=None, **kwargs)``
             in which F (n, m) and must return metrics in a (n,) array.

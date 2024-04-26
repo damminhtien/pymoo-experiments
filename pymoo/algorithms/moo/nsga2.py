@@ -31,7 +31,9 @@ def binary_tournament(pop, P, algorithm, **kwargs):
     for i in range(n_tournaments):
 
         a, b = P[i, 0], P[i, 1]
-        a_cv, a_f, b_cv, b_f = pop[a].CV[0], pop[a].F, pop[b].CV[0], pop[b].F
+        a_f, b_f = pop[a].F, pop[b].F
+        a_cv = getattr(pop[a], 'CV', [np.inf])[0]  # Default to inf if CV not found
+        b_cv = getattr(pop[b], 'CV', [np.inf])[0]  # Default to inf if CV not found
         rank_a, cd_a = pop[a].get("rank", "crowding")
         rank_b, cd_b = pop[b].get("rank", "crowding")
 
