@@ -8,7 +8,7 @@ from core.problem import Problem
 from util.misc import from_dict
 
 
-class WCVFAsObjective(Meta, Problem):
+class CDFAsObjective(Meta, Problem):
 
     def __init__(self,
                  problem,
