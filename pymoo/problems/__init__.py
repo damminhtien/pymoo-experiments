@@ -6,7 +6,7 @@ def get_problem(name, *args, **kwargs):
         from pymoo.vendor.vendor_coco import COCOProblem
         return COCOProblem(name.lower(), **kwargs)
 
-    from pymoo.problems.multi import BNH, Carside
+    from pymoo.problems.multi import BNH, Carside, SRN, Clutch
     from pymoo.problems.multi import CTP1, CTP2, CTP3, CTP4, CTP5, CTP6, CTP7, CTP8
     from pymoo.problems.multi import DASCMOP1, DASCMOP2, DASCMOP3, DASCMOP4, DASCMOP5, DASCMOP6, DASCMOP7, DASCMOP8, \
         DASCMOP9

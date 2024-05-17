@@ -11,4 +11,6 @@ from pymoo.problems.multi.tnk import *
 from pymoo.problems.multi.truss2d import *
 from pymoo.problems.multi.welded_beam import *
 from pymoo.problems.multi.zdt import *
+from pymoo.problems.multi.clutch import *
+from pymoo.problems.multi.wrm import *
 

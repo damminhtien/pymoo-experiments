@@ -150,6 +150,62 @@ class MyConstrRankAndCrowding(Survival):
         return survivors
 
 
+class MyConstrRankAndCrowding2(Survival):
+    def __init__(self, nds=None, crowding_func="cd"):
+        super().__init__(filter_infeasible=False)
+        self.nds = nds if nds is not None else NonDominatedSorting()
+        self.ranking = RankAndCrowding(nds=nds, crowding_func=crowding_func)
+
+    def _do(self, problem, pop, *args, n_survive=None, **kwargs):
+        if n_survive is None:
+            n_survive = len(pop)
+
+        F = pop.get("F")
+        CVR = F[:, -2]  # Constraint Violation Ratio
+        CV = F[:, -1]   # Overall Constraint Violation
+
+        # Boolean masks for feasible and infeasible individuals
+        feasible_mask = CV <= 0
+        infeasible_mask = CV > 0
+
+        # Use boolean masks directly to create new populations
+        feas_pop = pop[feasible_mask]
+        infeas_pop = pop[infeasible_mask]
+
+        # Rank and select feasible individuals
+        if len(feas_pop) > 0:
+            feas_survivors = self.ranking.do(
+                problem, feas_pop, *args, n_survive=min(len(feas_pop), n_survive), **kwargs)
+        else:
+            feas_survivors = Population()
+
+        n_remaining = n_survive - len(feas_survivors)
+
+        # Process infeasible individuals if needed
+        if n_remaining > 0 and len(infeas_pop) > 0:
+            # Filter CVR and CV for infeasible individuals
+            infeas_CVR = CVR[infeasible_mask]
+            infeas_CV = CV[infeasible_mask]
+
+            # Sort infeasible population by CVR first, then by CV if CVR values are equal
+            sorted_indices = np.lexsort((infeas_CV, infeas_CVR))
+
+            # Ensure n_remaining does not exceed the size of infeas_pop
+            n_to_select = min(n_remaining, len(infeas_pop))
+
+            if n_to_select > 0:
+                sorted_infeas_pop = infeas_pop[sorted_indices[:n_to_select]]
+            else:
+                sorted_infeas_pop = Population()
+
+            # Merge feasible and the best infeasible solutions
+            survivors = Population.merge(feas_survivors, sorted_infeas_pop)
+        else:
+            survivors = feas_survivors
+
+        return survivors
+
+
 class ParallelConstrRankAndCrowding(Survival):
     def __init__(self, nds=None, crowding_func="cd"):
         super().__init__(filter_infeasible=False)
