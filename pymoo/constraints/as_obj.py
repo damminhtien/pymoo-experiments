@@ -288,9 +288,10 @@ class CDFAsObjective2(Meta, Problem):
         # Calculation for wcvf adjusted for actual use of weights and frequencies
         wcvf = constraint_violation_mask * \
             weighted_constraints if n_constraints > 0 else np.zeros((m, 0))
-        if n_constraints > 0:
-            wcvf *= (1 - constraint_violation_frequencies /
-                     sum(constraint_violation_frequencies)).reshape(1, -1)
+        sum_f = sum(constraint_violation_frequencies)
+        if n_constraints > 0 and sum_f > 0:
+            wcvf *= (1 - 0.05*constraint_violation_frequencies /
+                     sum_f).reshape(1, -1)
 
         # Summing up the weighted constraint violation frequencies per sample
         sum_wcvf = np.sum(wcvf, axis=1).reshape(-1,
