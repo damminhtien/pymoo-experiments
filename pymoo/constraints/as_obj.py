@@ -224,11 +224,13 @@ class CDFAsObjective2(Meta, Problem):
     def __init__(self,
                  problem,
                  config=None,
-                 append=True):
+                 append=True,
+                 alpha=1):
 
         super().__init__(problem)
         self.config = config
         self.append = append
+        self.alpha = alpha
 
         if append:
             self.n_obj = problem.n_obj + 2
@@ -290,7 +292,109 @@ class CDFAsObjective2(Meta, Problem):
             weighted_constraints if n_constraints > 0 else np.zeros((m, 0))
         sum_f = sum(constraint_violation_frequencies)
         if n_constraints > 0 and sum_f > 0:
-            wcvf *= (1 - 0.05*constraint_violation_frequencies /
+            wcvf *= (1 - self.alpha*constraint_violation_frequencies /
+                     sum_f).reshape(1, -1)
+
+        # Summing up the weighted constraint violation frequencies per sample
+        sum_wcvf = np.sum(wcvf, axis=1).reshape(-1,
+                                                1) if n_constraints > 0 else np.zeros((m, 1))
+
+        CV = calc_cv(G=G, H=H, config=self.config)
+
+        # append the constraint violation as objective
+        if self.append:
+            out["F"] = anp.column_stack(
+                [F, sum_wcvf, CV])
+        else:
+            out["F"] = anp.column_stack(
+                [sum_wcvf, CV])
+
+        del out["G"]
+        del out["H"]
+
+        return out
+
+    def pareto_front(self, *args, **kwargs):
+        pf = super().pareto_front(*args, **kwargs)
+        if pf is not None:
+            pf = np.column_stack([np.zeros(len(pf)), pf])
+        return pf
+    
+
+class CDFAsObjective3(Meta, Problem):
+
+    def __init__(self,
+                 problem,
+                 config=None,
+                 append=True,
+                 alpha=1):
+
+        super().__init__(problem)
+        self.config = config
+        self.append = append
+        self.alpha = alpha
+
+        if append:
+            self.n_obj = problem.n_obj + 2
+        else:
+            self.n_obj = problem.n_obj
+
+        self.n_ieq_constr = 0
+        self.n_eq_constr = 0
+
+    def do(self, X, return_values_of, *args, **kwargs):
+        out = self.__object__.do(X, return_values_of, *args, **kwargs)
+
+        # get at the values from the output
+        F, G, H = from_dict(out, "F", "G", "H")
+
+        # store a backup of the values in out
+        out["__F__"], out["__G__"], out["__H__"] = F, G, H
+
+        # G is matrix (m,n), H is matrix (m,k)
+        m, n, k = G.shape[0], G.shape[1], H.shape[1]
+
+        # Define the total number of constraints
+        n_constraints = n + k
+
+        # Initialize weights for the constraints (assuming it should be of length n_constraints)
+        weighted_constraints = np.ones(n_constraints)
+
+        # Initialize a count for violation frequencies
+        constraint_violation_frequencies = np.zeros(n_constraints, dtype=int)
+
+        # Count violations in G if n > 0
+        if n > 0:
+            constraint_violation_frequencies[:n] = np.sum(G > 0, axis=0)
+
+        # Count violations in H if k > 0
+        if k > 0:
+            constraint_violation_frequencies[n:] = np.sum(H > 0, axis=0)
+
+        # Compute masks for constraint violations in G and H, handling empty cases
+        constraint_violation_mask_G = (G > 0).astype(
+            int) if n > 0 else np.zeros((m, 0), dtype=int)
+        constraint_violation_mask_H = (H > 0).astype(
+            int) if k > 0 else np.zeros((m, 0), dtype=int)
+
+        # Handle the combination and weighted calculation of violation masks based on G and H presence
+        if n > 0 and k > 0:
+            constraint_violation_mask = np.hstack(
+                [constraint_violation_mask_G, constraint_violation_mask_H])
+        elif n > 0:
+            constraint_violation_mask = constraint_violation_mask_G
+        elif k > 0:
+            constraint_violation_mask = constraint_violation_mask_H
+        else:
+            constraint_violation_mask = np.zeros(
+                (m, 0), dtype=int)  # No constraints to process
+
+        # Calculation for wcvf adjusted for actual use of weights and frequencies
+        wcvf = constraint_violation_mask * \
+            weighted_constraints if n_constraints > 0 else np.zeros((m, 0))
+        sum_f = sum(constraint_violation_frequencies)
+        if n_constraints > 0 and sum_f > 0:
+            wcvf *= (1 + self.alpha*constraint_violation_frequencies /
                      sum_f).reshape(1, -1)
 
         # Summing up the weighted constraint violation frequencies per sample
