@@ -8,6 +8,91 @@ from core.problem import Problem
 from util.misc import from_dict
 
 
+def calc_cvr(G, H, weighted_constraint_vector):
+    # Compute masks for constraint violations in G and H
+    constraint_violation_mask_G = (G > 0.00001).astype(int)
+    constraint_violation_mask_H = (H > 0.00001).astype(int)
+
+    # Combine masks
+    constraint_violation_mask = np.hstack(
+        [constraint_violation_mask_G, constraint_violation_mask_H])
+
+    # Calculate the weighted constraint violation vector
+    cv_vector = constraint_violation_mask * weighted_constraint_vector
+
+    # Summing up the weighted constraint violation frequencies per sample
+    cvr = np.sum(cv_vector, axis=1).reshape(-1, 1)
+
+    # Calculate and print the feasible rate
+    # infeasible_rate = np.sum(
+    #     np.sum(constraint_violation_mask, axis=1) > 0.0001) / m
+    # print(f'Infeasible rate: {infeasible_rate}')
+
+    # Debug prints
+    # print(np.sum(constraint_violation_mask, axis=0))
+    # print(f'cvr mean: {np.mean(cvr)}')
+    # print(cvr)
+    return cvr
+
+
+def calc_cdf(G, H):
+    # G is matrix (m, n), H is matrix (m, k)
+    m, n = G.shape[0], G.shape[1]
+    k = H.shape[1]
+
+    # Define the total number of constraints
+    n_constraints = n + k
+
+    # Initialize weights for the constraints (assuming it should be of length n_constraints)
+    weighted_constraints = np.ones(n_constraints)
+
+    # Initialize a count for violation frequencies
+    constraint_violation_frequencies = np.zeros(n_constraints, dtype=int)
+
+    # Count violations in G if n > 0
+    if n > 0:
+        constraint_violation_frequencies[:n] = np.sum(G > 0, axis=0)
+
+    # Count violations in H if k > 0
+    if k > 0:
+        constraint_violation_frequencies[n:] = np.sum(H > 0, axis=0)
+
+    # Compute masks for constraint violations in G and H
+    constraint_violation_mask_G = (G > 0).astype(int)
+    constraint_violation_mask_H = (H > 0).astype(int)
+
+    # Combine masks
+    constraint_violation_mask = np.hstack(
+        [constraint_violation_mask_G, constraint_violation_mask_H])
+
+    # Calculation for WCVF adjusted for actual use of weights and frequencies
+    cvr = constraint_violation_mask * weighted_constraints
+
+    f_sum = np.sum(constraint_violation_frequencies)
+    if f_sum == 0:
+        epsilon = 1
+    else:
+        epsilon = (1 + 0.5*constraint_violation_frequencies /
+                   f_sum).reshape(1, -1)
+
+    cdf = cvr*epsilon
+
+    # Summing up the weighted constraint violation frequencies per sample
+    cdf = np.sum(cdf, axis=1).reshape(-1, 1)
+
+    # Calculate and print the feasible rate
+    # infeasible_rate = np.sum(
+    #     np.sum(constraint_violation_mask, axis=1) > 0.0001) / m
+    # print(f'Infeasible rate: {infeasible_rate}')
+    print(epsilon)
+
+    # Debug prints
+    # print(np.sum(constraint_violation_mask, axis=0))
+    # print(f'CDF mean: {np.mean(cdf)}')
+
+    return cdf
+
+
 class CDFAsObjective(Meta, Problem):
 
     def __init__(self,
@@ -36,59 +121,7 @@ class CDFAsObjective(Meta, Problem):
         # store a backup of the values in out
         out["__F__"], out["__G__"], out["__H__"] = F, G, H
 
-        # G is matrix (m,n), H is matrix (m,k)
-        m, n, k = G.shape[0], G.shape[1], H.shape[1]
-
-        # Define the total number of constraints
-        n_constraints = n + k
-
-        # Initialize weights for the constraints (assuming it should be of length n_constraints)
-        weighted_constraints = np.ones(n_constraints)
-
-        # Initialize a count for violation frequencies
-        constraint_violation_frequencies = np.zeros(n_constraints, dtype=int)
-
-        # Count violations in G if n > 0
-        if n > 0:
-            constraint_violation_frequencies[:n] = np.sum(G > 0, axis=0)
-
-        # Count violations in H if k > 0
-        if k > 0:
-            constraint_violation_frequencies[n:] = np.sum(H > 0, axis=0)
-
-        # Compute masks for constraint violations in G and H, handling empty cases
-        constraint_violation_mask_G = (G > 0).astype(
-            int) if n > 0 else np.zeros((m, 0), dtype=int)
-        constraint_violation_mask_H = (H > 0).astype(
-            int) if k > 0 else np.zeros((m, 0), dtype=int)
-
-        # Handle the combination and weighted calculation of violation masks based on G and H presence
-        if n > 0 and k > 0:
-            constraint_violation_mask = np.hstack(
-                [constraint_violation_mask_G, constraint_violation_mask_H])
-        elif n > 0:
-            constraint_violation_mask = constraint_violation_mask_G
-        elif k > 0:
-            constraint_violation_mask = constraint_violation_mask_H
-        else:
-            constraint_violation_mask = np.zeros(
-                (m, 0), dtype=int)  # No constraints to process
-
-        # Calculation for wcvf adjusted for actual use of weights and frequencies
-        wcvf = constraint_violation_mask * \
-            weighted_constraints if n_constraints > 0 else np.zeros((m, 0))
-        if n_constraints > 0:
-            wcvf *= (1 - constraint_violation_frequencies /
-                     n_constraints / m).reshape(1, -1)
-
-        # Summing up the weighted constraint violation frequencies per sample
-        sum_wcvf = np.sum(wcvf, axis=1).reshape(-1,
-                                                1) if n_constraints > 0 else np.zeros((m, 1))
-
-        # Print sum_wcvf to verify (Comment out in final version)
-        # print(sum_wcvf)
-
-        # CV = calc_cv(G=G, H=H, config=self.config)
+        cdf = calc_cdf(G, H)
 
         # do something here
         # hybird method
@@ -106,9 +139,9 @@ class CDFAsObjective(Meta, Problem):
         # append the constraint violation as objective
         if self.append:
             out["F"] = anp.column_stack(
-                [F, sum_wcvf])
+                [F, cdf])
         else:
-            out["F"] = sum_wcvf
+            out["F"] = cdf
 
         del out["G"]
         del out["H"]
@@ -140,7 +173,7 @@ class CVRAsObjective(Meta, Problem):
                 self.n_ieq_constr+self.n_eq_constr)
         elif isinstance(weighted_constraint_vector, int) or isinstance(weighted_constraint_vector, float):
             weighted_constraint_vector = np.random.uniform(
-                low=0.1, high=weighted_constraint_vector, size=(self.n_ieq_constr+self.n_eq_constr))
+                low=1.0, high=weighted_constraint_vector, size=(self.n_ieq_constr+self.n_eq_constr))
         print(
             f'CVRAsObjective: weighted_constraint_vector={weighted_constraint_vector}')
         self.weighted_constraint_vector = weighted_constraint_vector
@@ -153,38 +186,6 @@ class CVRAsObjective(Meta, Problem):
         self.n_ieq_constr = 0
         self.n_eq_constr = 0
 
-    def calc_cvr(self, G, H):
-        # G is matrix (m,n), H is matrix (m,k)
-        m, n = G.shape[0], G.shape[1]
-        k = H.shape[1]
-
-        ocv = calc_cv(G=G, H=H, config=self.config)
-
-        # Compute masks for constraint violations in G and H
-        constraint_violation_mask_G = (G > 0.00001).astype(int)
-        constraint_violation_mask_H = (H > 0.00001).astype(int)
-
-        # Combine masks
-        constraint_violation_mask = np.hstack(
-            [constraint_violation_mask_G, constraint_violation_mask_H])
-
-        # Calculate the weighted constraint violation vector
-        cv_vector = constraint_violation_mask * self.weighted_constraint_vector
-
-        # Summing up the weighted constraint violation frequencies per sample
-        cvr = np.sum(cv_vector, axis=1).reshape(-1, 1)
-
-        # Calculate and print the feasible rate
-        infeasible_rate = np.sum(
-            np.sum(constraint_violation_mask, axis=1) > 0.0001) / m
-        print(f'Infeasible rate: {infeasible_rate}')
-
-        # Debug prints
-        print(np.sum(constraint_violation_mask, axis=0))
-        print(f'cvr mean: {np.mean(cvr)}')
-        # print(cvr)
-        return cvr
-
     def do(self, X, return_values_of, *args, **kwargs):
         out = self.__object__.do(X, return_values_of, *args, **kwargs)
 
@@ -194,7 +195,7 @@ class CVRAsObjective(Meta, Problem):
         # store a backup of the values in out
         out["__F__"], out["__G__"], out["__H__"] = F, G, H
 
-        cvr = self.calc_cvr(G, H)
+        cvr = calc_cvr(G, H, self.weighted_constraint_vector)
 
         # append the constraint violation as objective
         if self.append:
@@ -215,7 +216,7 @@ class CVRAsObjective(Meta, Problem):
         return pf
 
 
-class CDFAsObjective2(CVRAsObjective):
+class CDFAsObjective2(CDFAsObjective):
     def __init__(self,
                  problem,
                  config=None,
@@ -244,65 +245,17 @@ class CDFAsObjective2(CVRAsObjective):
         # store a backup of the values in out
         out["__F__"], out["__G__"], out["__H__"] = F, G, H
 
-        # G is matrix (m,n), H is matrix (m,k)
-        m, n, k = G.shape[0], G.shape[1], H.shape[1]
-
-        # Define the total number of constraints
-        n_constraints = n + k
-
-        # Initialize weights for the constraints (assuming it should be of length n_constraints)
-        weighted_constraints = np.ones(n_constraints)
-
-        # Initialize a count for violation frequencies
-        constraint_violation_frequencies = np.zeros(n_constraints, dtype=int)
-
-        # Count violations in G if n > 0
-        if n > 0:
-            constraint_violation_frequencies[:n] = np.sum(G > 0, axis=0)
-
-        # Count violations in H if k > 0
-        if k > 0:
-            constraint_violation_frequencies[n:] = np.sum(H > 0, axis=0)
-
-        # Compute masks for constraint violations in G and H, handling empty cases
-        constraint_violation_mask_G = (G > 0).astype(
-            int) if n > 0 else np.zeros((m, 0), dtype=int)
-        constraint_violation_mask_H = (H > 0).astype(
-            int) if k > 0 else np.zeros((m, 0), dtype=int)
-
-        # Handle the combination and weighted calculation of violation masks based on G and H presence
-        if n > 0 and k > 0:
-            constraint_violation_mask = np.hstack(
-                [constraint_violation_mask_G, constraint_violation_mask_H])
-        elif n > 0:
-            constraint_violation_mask = constraint_violation_mask_G
-        elif k > 0:
-            constraint_violation_mask = constraint_violation_mask_H
-        else:
-            constraint_violation_mask = np.zeros(
-                (m, 0), dtype=int)  # No constraints to process
-
-        # Calculation for wcvf adjusted for actual use of weights and frequencies
-        wcvf = constraint_violation_mask * \
-            weighted_constraints if n_constraints > 0 else np.zeros((m, 0))
-        sum_f = sum(constraint_violation_frequencies)
-        if n_constraints > 0 and sum_f > 0:
-            wcvf *= (1 - self.alpha*constraint_violation_frequencies /
-                     sum_f).reshape(1, -1)
-
-        # Summing up the weighted constraint violation frequencies per sample
-        sum_wcvf = np.sum(wcvf, axis=1).reshape(-1,
-                                                1) if n_constraints > 0 else np.zeros((m, 1))
+        cdf = calc_cdf(G, H)
 
         CV = calc_cv(G=G, H=H, config=self.config)
 
         # append the constraint violation as objective
         if self.append:
             out["F"] = anp.column_stack(
-                [F, sum_wcvf, CV])
+                [F, cdf, CV])
         else:
             out["F"] = anp.column_stack(
-                [sum_wcvf, CV])
+                [cdf, CV])
 
         del out["G"]
         del out["H"]
@@ -314,7 +267,7 @@ class CDFAsObjective2(CVRAsObjective):
         if pf is not None:
             pf = np.column_stack([np.zeros(len(pf)), pf])
         return pf
-    
+
 
 class CDFAsObjective3(Meta, Problem):
 
@@ -346,65 +299,17 @@ class CDFAsObjective3(Meta, Problem):
         # store a backup of the values in out
         out["__F__"], out["__G__"], out["__H__"] = F, G, H
 
-        # G is matrix (m,n), H is matrix (m,k)
-        m, n, k = G.shape[0], G.shape[1], H.shape[1]
-
-        # Define the total number of constraints
-        n_constraints = n + k
-
-        # Initialize weights for the constraints (assuming it should be of length n_constraints)
-        weighted_constraints = np.ones(n_constraints)
-
-        # Initialize a count for violation frequencies
-        constraint_violation_frequencies = np.zeros(n_constraints, dtype=int)
-
-        # Count violations in G if n > 0
-        if n > 0:
-            constraint_violation_frequencies[:n] = np.sum(G > 0, axis=0)
-
-        # Count violations in H if k > 0
-        if k > 0:
-            constraint_violation_frequencies[n:] = np.sum(H > 0, axis=0)
-
-        # Compute masks for constraint violations in G and H, handling empty cases
-        constraint_violation_mask_G = (G > 0).astype(
-            int) if n > 0 else np.zeros((m, 0), dtype=int)
-        constraint_violation_mask_H = (H > 0).astype(
-            int) if k > 0 else np.zeros((m, 0), dtype=int)
-
-        # Handle the combination and weighted calculation of violation masks based on G and H presence
-        if n > 0 and k > 0:
-            constraint_violation_mask = np.hstack(
-                [constraint_violation_mask_G, constraint_violation_mask_H])
-        elif n > 0:
-            constraint_violation_mask = constraint_violation_mask_G
-        elif k > 0:
-            constraint_violation_mask = constraint_violation_mask_H
-        else:
-            constraint_violation_mask = np.zeros(
-                (m, 0), dtype=int)  # No constraints to process
-
-        # Calculation for wcvf adjusted for actual use of weights and frequencies
-        wcvf = constraint_violation_mask * \
-            weighted_constraints if n_constraints > 0 else np.zeros((m, 0))
-        sum_f = sum(constraint_violation_frequencies)
-        if n_constraints > 0 and sum_f > 0:
-            wcvf *= (1 + self.alpha*constraint_violation_frequencies /
-                     sum_f).reshape(1, -1)
-
-        # Summing up the weighted constraint violation frequencies per sample
-        sum_wcvf = np.sum(wcvf, axis=1).reshape(-1,
-                                                1) if n_constraints > 0 else np.zeros((m, 1))
+        cdf = calc_cdf(G, H)
 
         CV = calc_cv(G=G, H=H, config=self.config)
 
         # append the constraint violation as objective
         if self.append:
             out["F"] = anp.column_stack(
-                [F, sum_wcvf, CV])
+                [F, cdf, CV])
         else:
             out["F"] = anp.column_stack(
-                [sum_wcvf, CV])
+                [cdf, CV])
 
         del out["G"]
         del out["H"]
@@ -428,9 +333,17 @@ class CVRAsObjective2(Meta, Problem):
         super().__init__(problem)
         self.config = config
         self.append = append
-        self.weighted_constraint_vector = weighted_constraint_vector
+
+        if weighted_constraint_vector is None:
+            # Initialize weights for the constraints (assuming it should be of length n_constraints)
+            weighted_constraint_vector = np.ones(
+                self.n_ieq_constr+self.n_eq_constr)
+        elif isinstance(weighted_constraint_vector, int) or isinstance(weighted_constraint_vector, float):
+            weighted_constraint_vector = np.random.uniform(
+                low=1.0, high=weighted_constraint_vector, size=(self.n_ieq_constr+self.n_eq_constr))
         print(
             f'CVRAsObjective2: weighted_constraint_vector={weighted_constraint_vector}')
+        self.weighted_constraint_vector = weighted_constraint_vector
 
         if append:
             self.n_obj = problem.n_obj + 2
@@ -449,7 +362,7 @@ class CVRAsObjective2(Meta, Problem):
         # store a backup of the values in out
         out["__F__"], out["__G__"], out["__H__"] = F, G, H
 
-        cvr = self.calc_cvr(G, H)
+        cvr = calc_cvr(G, H, self.weighted_constraint_vector)
 
         ocv = calc_cv(G=G, H=H, config=self.config)
 

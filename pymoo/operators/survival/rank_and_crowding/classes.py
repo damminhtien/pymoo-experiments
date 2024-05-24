@@ -120,8 +120,8 @@ class MyConstrRankAndCrowding(Survival):
         CV = F[:, -1]
 
         # Boolean masks for feasible and infeasible individuals
-        feasible_mask = CV <= 0.00001
-        infeasible_mask = CV > 0.00001
+        feasible_mask = CV <= 0.000001
+        infeasible_mask = CV > 0.000001
 
         # Use boolean masks directly to create new populations
         feas_pop = pop[feasible_mask]
