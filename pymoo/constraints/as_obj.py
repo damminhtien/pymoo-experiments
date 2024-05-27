@@ -35,7 +35,7 @@ def calc_cvr(G, H, weighted_constraint_vector):
     return cvr
 
 
-def calc_cdf(G, H):
+def calc_cdf(G, H, alpha=0.5):
     # G is matrix (m, n), H is matrix (m, k)
     m, n = G.shape[0], G.shape[1]
     k = H.shape[1]
@@ -72,7 +72,7 @@ def calc_cdf(G, H):
     if f_sum == 0:
         epsilon = 1
     else:
-        epsilon = (1 + 0.5*constraint_violation_frequencies /
+        epsilon = (1 + alpha*constraint_violation_frequencies /
                    f_sum).reshape(1, -1)
 
     cdf = cvr*epsilon
@@ -84,7 +84,7 @@ def calc_cdf(G, H):
     # infeasible_rate = np.sum(
     #     np.sum(constraint_violation_mask, axis=1) > 0.0001) / m
     # print(f'Infeasible rate: {infeasible_rate}')
-    print(epsilon)
+    # print(epsilon)
 
     # Debug prints
     # print(np.sum(constraint_violation_mask, axis=0))
@@ -299,7 +299,7 @@ class CDFAsObjective3(Meta, Problem):
         # store a backup of the values in out
         out["__F__"], out["__G__"], out["__H__"] = F, G, H
 
-        cdf = calc_cdf(G, H)
+        cdf = calc_cdf(G, H, alpha=self.alpha)
 
         CV = calc_cv(G=G, H=H, config=self.config)
 
