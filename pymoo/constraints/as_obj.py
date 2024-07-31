@@ -58,8 +58,8 @@ def calc_cdf(G, H, alpha=0.5):
         constraint_violation_frequencies[n:] = np.sum(H > 0, axis=0)
 
     # Compute masks for constraint violations in G and H
-    constraint_violation_mask_G = (G > 0).astype(int)
-    constraint_violation_mask_H = (H > 0).astype(int)
+    constraint_violation_mask_G = (G > 0.00001).astype(int)
+    constraint_violation_mask_H = (H > 0.00001).astype(int)
 
     # Combine masks
     constraint_violation_mask = np.hstack(
@@ -98,11 +98,13 @@ class CDFAsObjective(Meta, Problem):
     def __init__(self,
                  problem,
                  config=None,
-                 append=True):
+                 append=True,
+                 alpha=0.5):
 
         super().__init__(problem)
         self.config = config
         self.append = append
+        self.alpha = alpha
 
         if append:
             self.n_obj = problem.n_obj + 1
@@ -121,7 +123,7 @@ class CDFAsObjective(Meta, Problem):
         # store a backup of the values in out
         out["__F__"], out["__G__"], out["__H__"] = F, G, H
 
-        cdf = calc_cdf(G, H)
+        cdf = calc_cdf(G, H, self.alpha)
 
         # do something here
         # hybird method

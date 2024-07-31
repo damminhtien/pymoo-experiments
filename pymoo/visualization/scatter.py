@@ -29,7 +29,7 @@ def plot_2d(sc):
         ax.set_xlabel(labels[0])
         ax.set_ylabel(labels[1])
 
-    ax.legend(loc = "upper right")
+    ax.legend(loc = "bottom left")
     ax.grid()
 
     return sc
@@ -57,7 +57,7 @@ def plot_3d(sc, angle):
         if sc.angle is not None:
             ax.view_init(*angle)
 
-    ax.legend(loc = "upper right")
+    ax.legend(loc = "upper left")
     ax.grid()
 
 def plot_pairwise(sc):
