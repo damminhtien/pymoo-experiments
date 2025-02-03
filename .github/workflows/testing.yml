@@ -7,8 +7,8 @@ on:
       - master
   pull_request:
   workflow_dispatch:
-  schedule:
-    - cron: '0 6 * * 1'
+  # schedule:
+  #   - cron: '0 0 * * 0'
 
 jobs:
   testing:
